@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#050508;--bg2:#080810;--bg3:#0d0d1a;
+  --cyan:#00f5ff;--pink:#ff006e;--green:#00ff88;--yellow:#ffee00;--purple:#bf00ff;
+  --cyan-d:#00c8d4;--pink-d:#cc0058;
+  --glow-c:0 0 20px #00f5ff80,0 0 60px #00f5ff30;
+  --glow-p:0 0 20px #ff006e80,0 0 60px #ff006e30;
+  --glow-g:0 0 20px #00ff8880,0 0 60px #00ff8830;
+  --border:#ffffff12;--border2:#ffffff20;
+  --text:#e8eaf8;--muted:#6b7090;--muted2:#9ba3cc;
+  --font-title:'Orbitron',sans-serif;
+  --font-mono:'Share Tech Mono',monospace;
+  --font-body:'Inter',sans-serif;
+}
+html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body)}
+::-webkit-scrollbar{width:4px;background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:#ffffff20;border-radius:2px}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.7}94%{opacity:1}97%{opacity:.85}98%{opacity:1}}
+@keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes glow-pulse{0%,100%{box-shadow:var(--glow-c)}50%{box-shadow:0 0 30px #00f5ffaa,0 0 80px #00f5ff50}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes grid-scroll{0%{background-position:0 0}100%{background-position:0 80px}}
+@keyframes neon-flicker{0%,19%,21%,23%,25%,54%,56%,100%{text-shadow:0 0 10px var(--cyan),0 0 20px var(--cyan),0 0 40px var(--cyan)}20%,24%,55%{text-shadow:none}}
+@keyframes border-run{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+.scanline-overlay{pointer-events:none;position:fixed;inset:0;z-index:9999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,245,255,.015) 2px,rgba(0,245,255,.015) 4px)}
+.grid-bg{position:fixed;inset:0;z-index:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;animation:grid-scroll 8s linear infinite;pointer-events:none}
+.vignette{position:fixed;inset:0;z-index:1;background:radial-gradient(ellipse at center,transparent 40%,var(--bg) 100%);pointer-events:none}
+
+/* ─── Auth ─── */
+.auth-wrap{position:relative;z-index:2;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.auth-card{width:460px;background:linear-gradient(135deg,rgba(13,13,26,.9),rgba(8,8,16,.95));border:1px solid var(--cyan);border-radius:2px;padding:48px;position:relative;overflow:hidden;animation:fadeIn .6s ease}
+.auth-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:border-run 3s linear infinite}
+.auth-card::after{content:'';position:absolute;bottom:0;right:0;left:0;height:1px;background:linear-gradient(90deg,transparent,var(--pink),transparent);animation:border-run 3s linear infinite reverse}
+.auth-logo{font-family:var(--font-title);font-size:32px;font-weight:900;color:var(--cyan);text-shadow:var(--glow-c);animation:neon-flicker 8s infinite;letter-spacing:4px;margin-bottom:4px}
+.auth-sub{font-family:var(--font-mono);font-size:12px;color:var(--muted2);margin-bottom:40px;letter-spacing:2px}
+.auth-tabs{display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:2px;margin-bottom:32px;overflow:hidden}
+.auth-tab{flex:1;padding:10px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font-mono);font-size:13px;letter-spacing:1px;transition:all .2s;position:relative}
+.auth-tab.active{background:rgba(0,245,255,.08);color:var(--cyan);text-shadow:0 0 10px var(--cyan)}
+.auth-tab.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.field{margin-bottom:18px}
+.field label{display:block;font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:2px;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:10px 14px;background:rgba(0,245,255,.04);border:1px solid #ffffff20;border-radius:2px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;transition:all .2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan);background:rgba(0,245,255,.08);box-shadow:0 0 0 1px var(--cyan)40,inset 0 0 20px rgba(0,245,255,.03)}
+.field textarea{resize:vertical;min-height:80px}
+.field select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2300f5ff' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.field select option{background:var(--bg3)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn-neon{width:100%;padding:13px;background:transparent;border:1px solid var(--cyan);border-radius:2px;color:var(--cyan);font-family:var(--font-title);font-size:13px;font-weight:700;letter-spacing:3px;cursor:pointer;position:relative;overflow:hidden;transition:all .3s;text-transform:uppercase}
+.btn-neon::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,245,255,.15),transparent);transition:left .4s}
+.btn-neon:hover::before{left:100%}
+.btn-neon:hover{background:rgba(0,245,255,.1);box-shadow:var(--glow-c);text-shadow:0 0 10px var(--cyan)}
+.err{color:var(--pink);font-family:var(--font-mono);font-size:12px;margin-top:12px;text-align:center;text-shadow:0 0 8px var(--pink)}
+
+/* ─── App Shell ─── */
+.app{display:flex;min-height:100vh;position:relative;z-index:2}
+.sidebar{width:260px;min-height:100vh;background:linear-gradient(180deg,rgba(8,8,16,.98) 0%,rgba(5,5,8,.98) 100%);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10;overflow-y:auto}
+.sidebar-logo{padding:28px 20px 22px;font-family:var(--font-title);font-size:22px;font-weight:900;color:var(--cyan);letter-spacing:4px;text-shadow:var(--glow-c);border-bottom:1px solid var(--border);animation:flicker 10s infinite}
+.sidebar-logo span{color:var(--pink);text-shadow:var(--glow-p)}
+.sidebar-section{padding:20px 12px 8px}
+.sidebar-label{font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:3px;padding:0 10px;margin-bottom:8px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:2px;cursor:pointer;color:var(--muted2);font-size:13px;font-family:var(--font-mono);letter-spacing:.5px;transition:all .2s;margin-bottom:2px;border:1px solid transparent;position:relative;overflow:hidden}
+.nav-item::before{content:'';position:absolute;left:-100%;top:0;height:100%;width:60%;background:linear-gradient(90deg,transparent,rgba(0,245,255,.06),transparent);transition:left .3s}
+.nav-item:hover::before{left:100%}
+.nav-item:hover{color:var(--cyan);border-color:var(--border2)}
+.nav-item.active{color:var(--cyan);border-color:var(--cyan)30;background:rgba(0,245,255,.05)}
+.nav-item.active::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.proj-list{padding:0 12px}
+.proj-nav{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:2px;cursor:pointer;color:var(--muted);font-size:12px;font-family:var(--font-mono);transition:all .2s;border:1px solid transparent;margin-bottom:1px}
+.proj-nav:hover{color:var(--cyan);border-color:var(--border)}
+.proj-nav.active{color:var(--cyan)}
+.proj-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);flex-shrink:0;animation:pulse 2s infinite}
+.sidebar-user{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.user-avatar{width:36px;height:36px;border-radius:2px;border:1px solid var(--cyan);display:flex;align-items:center;justify-content:center;font-family:var(--font-title);font-size:13px;font-weight:700;color:var(--cyan);text-shadow:0 0 8px var(--cyan);flex-shrink:0}
+.user-info{flex:1;min-width:0}
+.user-name{font-family:var(--font-mono);font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role-tag{font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:1px}
+.logout-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px;transition:color .2s;font-family:var(--font-mono)}
+.logout-btn:hover{color:var(--pink);text-shadow:0 0 8px var(--pink)}
+
+/* ─── Main ─── */
+.main{margin-left:260px;flex:1;min-height:100vh}
+.topbar{padding:22px 36px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(5,5,8,.9);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
+.page-title{font-family:var(--font-title);font-size:20px;font-weight:700;color:var(--cyan);letter-spacing:2px;text-shadow:0 0 15px var(--cyan)60}
+.page-sub{font-family:var(--font-mono);font-size:11px;color:var(--muted);letter-spacing:1px;margin-top:3px}
+.top-actions{display:flex;gap:10px;align-items:center}
+
+/* ─── Buttons ─── */
+.btn{padding:8px 18px;border-radius:2px;font-size:12px;font-family:var(--font-mono);font-weight:600;cursor:pointer;border:1px solid;transition:all .2s;letter-spacing:1px;text-transform:uppercase;position:relative;overflow:hidden}
+.btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);transition:left .3s}
+.btn:hover::before{left:100%}
+.btn-c{background:rgba(0,245,255,.08);border-color:var(--cyan);color:var(--cyan)}
+.btn-c:hover{background:rgba(0,245,255,.16);box-shadow:var(--glow-c)}
+.btn-p{background:rgba(255,0,110,.08);border-color:var(--pink);color:var(--pink)}
+.btn-p:hover{background:rgba(255,0,110,.16);box-shadow:var(--glow-p)}
+.btn-g{background:rgba(0,255,136,.08);border-color:var(--green);color:var(--green)}
+.btn-g:hover{background:rgba(0,255,136,.16);box-shadow:var(--glow-g)}
+.btn-ghost{background:transparent;border-color:var(--border2);color:var(--muted2)}
+.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-sm{padding:5px 12px;font-size:11px}
+.btn-xs{padding:3px 8px;font-size:10px}
+
+/* ─── Content ─── */
+.content{padding:30px 36px;animation:fadeIn .4s ease}
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.section-title{font-family:var(--font-title);font-size:14px;font-weight:600;color:var(--muted2);letter-spacing:2px}
+
+/* ─── Stats ─── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:32px}
+.stat{background:linear-gradient(135deg,var(--bg3),var(--bg2));border:1px solid var(--border);border-radius:2px;padding:20px;position:relative;overflow:hidden;transition:all .3s;cursor:default}
+.stat:hover{transform:translateY(-2px)}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat.c::before{background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+.stat.p::before{background:var(--pink);box-shadow:0 0 10px var(--pink)}
+.stat.g::before{background:var(--green);box-shadow:0 0 10px var(--green)}
+.stat.y::before{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
+.stat:hover.c{box-shadow:0 4px 24px rgba(0,245,255,.15)}
+.stat:hover.p{box-shadow:0 4px 24px rgba(255,0,110,.15)}
+.stat:hover.g{box-shadow:0 4px 24px rgba(0,255,136,.15)}
+.stat-lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:10px}
+.stat-val{font-family:var(--font-title);font-size:36px;font-weight:900;line-height:1}
+.stat.c .stat-val{color:var(--cyan);text-shadow:0 0 20px var(--cyan)60}
+.stat.p .stat-val{color:var(--pink);text-shadow:0 0 20px var(--pink)60}
+.stat.g .stat-val{color:var(--green);text-shadow:0 0 20px var(--green)60}
+.stat.y .stat-val{color:var(--yellow);text-shadow:0 0 20px var(--yellow)60}
+.stat-corner{position:absolute;bottom:10px;right:14px;font-size:28px;opacity:.08}
+
+/* ─── Project Cards ─── */
+.projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.proj-card{background:linear-gradient(135deg,var(--bg3) 0%,var(--bg2) 100%);border:1px solid var(--border);border-radius:2px;padding:24px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;animation:fadeIn .4s ease}
+.proj-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan)60,transparent);opacity:0;transition:opacity .3s}
+.proj-card:hover::before{opacity:1}
+.proj-card:hover{border-color:var(--cyan)40;transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,245,255,.1)}
+.proj-card-name{font-family:var(--font-title);font-size:15px;font-weight:700;color:var(--text);letter-spacing:1px;margin-bottom:8px}
+.proj-card-desc{font-size:12px;color:var(--muted2);line-height:1.6;margin-bottom:20px;min-height:36px;font-family:var(--font-mono)}
+.prog-bar{height:3px;background:var(--bg);border-radius:1px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border)}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:1px;transition:width .8s cubic-bezier(.25,.46,.45,.94);box-shadow:0 0 8px var(--cyan)}
+.proj-meta{display:flex;justify-content:space-between;align-items:center}
+.proj-counts{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.proj-pct{font-family:var(--font-mono);font-size:11px;color:var(--cyan)}
+.avatar-row{display:flex}
+.m-avatar{width:22px;height:22px;border-radius:2px;border:1px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:9px;font-family:var(--font-title);font-weight:700;color:var(--bg);margin-left:-4px;flex-shrink:0}
+
+/* ─── Kanban ─── */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kan-col{background:var(--bg2);border:1px solid var(--border);border-radius:2px;padding:14px;min-height:400px}
+.kan-col-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.kan-col-title{font-family:var(--font-mono);font-size:11px;letter-spacing:2px;font-weight:600}
+.kan-count{font-family:var(--font-title);font-size:13px;font-weight:700}
+.kan-task{background:linear-gradient(135deg,var(--bg3),var(--bg));border:1px solid var(--border);border-radius:2px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;animation:slideIn .3s ease}
+.kan-task::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px}
+.kan-task:hover{transform:translateX(3px);border-color:var(--border2)}
+.kan-task-title{font-size:12px;color:var(--text);line-height:1.4;margin-bottom:8px;font-family:var(--font-mono)}
+.kan-task-footer{display:flex;justify-content:space-between;align-items:center}
+
+/* ─── Tasks List ─── */
+.tasks-list{display:flex;flex-direction:column;gap:6px}
+.task-row{background:linear-gradient(90deg,var(--bg3),var(--bg2));border:1px solid var(--border);border-radius:2px;padding:14px 18px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s;animation:slideIn .3s ease;position:relative;overflow:hidden}
+.task-row::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px}
+.task-row:hover{border-color:var(--border2);transform:translateX(4px)}
+.task-status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.task-title{flex:1;font-size:13px;font-family:var(--font-mono);color:var(--text)}
+.task-title.done{text-decoration:line-through;color:var(--muted)}
+.task-row-meta{display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+/* ─── Badges ─── */
+.badge{padding:2px 8px;border-radius:2px;font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:1px;border:1px solid}
+.b-todo{background:rgba(107,112,144,.1);border-color:rgba(107,112,144,.3);color:var(--muted2)}
+.b-in_progress{background:rgba(0,245,255,.08);border-color:rgba(0,245,255,.3);color:var(--cyan)}
+.b-review{background:rgba(255,238,0,.08);border-color:rgba(255,238,0,.3);color:var(--yellow)}
+.b-done{background:rgba(0,255,136,.08);border-color:rgba(0,255,136,.3);color:var(--green)}
+.b-low{background:rgba(107,112,144,.08);border-color:rgba(107,112,144,.2);color:var(--muted)}
+.b-medium{background:rgba(0,245,255,.06);border-color:rgba(0,245,255,.2);color:var(--cyan)}
+.b-high{background:rgba(255,238,0,.06);border-color:rgba(255,238,0,.2);color:var(--yellow)}
+.b-urgent{background:rgba(255,0,110,.1);border-color:rgba(255,0,110,.3);color:var(--pink)}
+.b-overdue{background:rgba(255,0,110,.15);border-color:var(--pink);color:var(--pink);animation:pulse 1.5s infinite}
+.b-admin{background:rgba(191,0,255,.1);border-color:rgba(191,0,255,.3);color:var(--purple)}
+.b-member{background:rgba(107,112,144,.08);border-color:rgba(107,112,144,.2);color:var(--muted2)}
+.b-owner{background:rgba(0,245,255,.08);border-color:var(--cyan)40;color:var(--cyan)}
+
+/* ─── Filters ─── */
+.filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.filter-chip{padding:6px 14px;border-radius:2px;font-size:11px;font-family:var(--font-mono);cursor:pointer;border:1px solid var(--border);color:var(--muted);background:transparent;transition:all .2s;letter-spacing:1px}
+.filter-chip.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,245,255,.08);box-shadow:0 0 10px rgba(0,245,255,.1)}
+.filter-chip:hover:not(.active){border-color:var(--border2);color:var(--muted2)}
+
+/* ─── Modal ─── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.modal-overlay.open{display:flex}
+.modal{background:linear-gradient(135deg,var(--bg3) 0%,var(--bg2) 100%);border:1px solid var(--cyan)50;border-radius:2px;padding:36px;width:540px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative;animation:fadeIn .3s ease;box-shadow:var(--glow-c),inset 0 0 40px rgba(0,245,255,.02)}
+.modal::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.modal-title{font-family:var(--font-title);font-size:16px;font-weight:700;color:var(--cyan);letter-spacing:2px;margin-bottom:24px;text-shadow:0 0 10px var(--cyan)40}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+
+/* ─── Tabs ─── */
+.tabs{display:flex;gap:0;margin-bottom:24px;border:1px solid var(--border);border-radius:2px;overflow:hidden;width:fit-content}
+.tab{padding:8px 20px;cursor:pointer;font-family:var(--font-mono);font-size:12px;letter-spacing:1px;color:var(--muted);background:transparent;border:none;border-right:1px solid var(--border);transition:all .2s}
+.tab:last-child{border-right:none}
+.tab.active{color:var(--cyan);background:rgba(0,245,255,.08);text-shadow:0 0 8px var(--cyan)}
+.tab:hover:not(.active){color:var(--muted2)}
+
+/* ─── Members Table ─── */
+.mtable{width:100%;border-collapse:collapse}
+.mtable th{font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border);text-transform:uppercase;text-align:left}
+.mtable td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;font-family:var(--font-mono);color:var(--text)}
+.mtable tr:hover td{background:rgba(0,245,255,.02)}
+.mtable tr:last-child td{border-bottom:none}
+
+/* ─── Back btn ─── */
+.back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-family:var(--font-mono);font-size:12px;cursor:pointer;margin-bottom:22px;letter-spacing:1px;transition:all .2s;border:none;background:none}
+.back-btn:hover{color:var(--cyan)}
+
+/* ─── Empty ─── */
+.empty{text-align:center;padding:60px;color:var(--muted);animation:fadeIn .4s ease}
+.empty-icon{font-size:36px;margin-bottom:14px;opacity:.5;animation:float 3s ease infinite}
+.empty-title{font-family:var(--font-title);font-size:14px;letter-spacing:2px;color:var(--muted2);margin-bottom:6px}
+.empty-sub{font-family:var(--font-mono);font-size:12px;letter-spacing:1px}
+
+/* ─── Toast ─── */
+.toast{position:fixed;bottom:28px;right:28px;z-index:9999;background:var(--bg3);border:1px solid;border-radius:2px;padding:12px 20px;font-family:var(--font-mono);font-size:12px;letter-spacing:1px;transform:translateY(120px);opacity:0;transition:all .3s cubic-bezier(.25,.46,.45,.94)}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:var(--green);color:var(--green);box-shadow:0 0 20px rgba(0,255,136,.2)}
+.toast.error{border-color:var(--pink);color:var(--pink);box-shadow:0 0 20px rgba(255,0,110,.2)}
+
+/* ─── Add member row ─── */
+.add-member-row{display:flex;gap:8px;margin-bottom:16px;align-items:flex-end}
+.add-member-row .field{flex:1;margin:0}
+.add-member-row select{flex:1}
+
+/* ─── Loader ─── */
+.loader{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
+
+/* Color helpers */
+.clr-cyan{color:var(--cyan)}.clr-pink{color:var(--pink)}.clr-green{color:var(--green)}.clr-yellow{color:var(--yellow)}.clr-muted{color:var(--muted)}.clr-muted2{color:var(--muted2)}
+.mono{font-family:var(--font-mono)}
+</style>
+</head>
+<body>
+<div class="scanline-overlay"></div>
+<div class="grid-bg"></div>
+<div class="vignette"></div>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState, useEffect, useCallback, useRef} = React;
+const API = '/api';
+
+// ── API helper ─────────────────────────────────────────────
+let _token = localStorage.getItem('tf_token') || '';
+const setToken = t => { _token = t; localStorage.setItem('tf_token', t); };
+
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(_token ? { Authorization: `Bearer ${_token}` } : {}) }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw data;
+  return data;
+}
+
+// ── Utils ──────────────────────────────────────────────────
+const statusColors = { todo:'#6b7090', in_progress:'#00f5ff', review:'#ffee00', done:'#00ff88' };
+const statusGlows  = { todo:'none', in_progress:'0 0 6px #00f5ff', review:'0 0 6px #ffee00', done:'0 0 6px #00ff88' };
+const priorityAvatarColors = ['#00f5ff','#ff006e','#00ff88','#ffee00','#bf00ff'];
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function isOverdue(due, status) {
+  if (!due || status==='done') return false;
+  return new Date(due) < new Date(new Date().toDateString());
+}
+function initials(u) { return ((u.first_name||u.username)[0]||'?').toUpperCase(); }
+function avatarColor(id) { return priorityAvatarColors[id % priorityAvatarColors.length]; }
+
+// ── Toast ──────────────────────────────────────────────────
+function Toast({msg, type, visible}) {
+  return <div className={`toast ${type} ${visible?'show':''}`}>{msg}</div>;
+}
+
+// ── Global toast hook (singleton) ─────────────────────────
+let _showToast = () => {};
+function useToast() {
+  const [state, setState] = useState({msg:'',type:'success',visible:false});
+  _showToast = useCallback((msg, type='success') => {
+    setState({msg, type, visible:true});
+    setTimeout(() => setState(s => ({...s, visible:false})), 3000);
+  }, []);
+  return state;
+}
+
+// ── Modal ─────────────────────────────────────────────────
+function Modal({id, title, children, footer, onClose}) {
+  return (
+    <div className="modal-overlay" id={id} onClick={e=>e.target.id===id&&onClose?.()}>
+      <div className="modal">
+        <div className="modal-title">{title}</div>
+        {children}
+        {footer && <div className="modal-footer">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Auth ──────────────────────────────────────────────────
+function AuthScreen({onAuth}) {
+  const [tab, setTab] = useState('login');
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({username:'',password:'',email:'',first_name:'',last_name:''});
+  const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
+
+  async function doLogin() {
+    setLoading(true); setErr('');
+    try {
+      const d = await api('POST','/auth/login/',{username:form.username,password:form.password});
+      setToken(d.access); onAuth(d.user);
+    } catch(e) { setErr(e.error||'LOGIN_FAILED'); }
+    setLoading(false);
+  }
+
+  async function doRegister() {
+    setLoading(true); setErr('');
+    try {
+      const d = await api('POST','/auth/register/',{username:form.username,password:form.password,email:form.email,first_name:form.first_name,last_name:form.last_name});
+      setToken(d.access); onAuth(d.user);
+    } catch(e) { setErr(Object.values(e).flat()[0]||'REGISTER_FAILED'); }
+    setLoading(false);
+  }
+
+  const onKey = fn => e => e.key==='Enter' && fn();
+
+  return (
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div className="auth-logo">TASK<span>FLOW</span></div>
+        <div className="auth-sub">// MISSION CONTROL v2.0</div>
+        <div className="auth-tabs">
+          <button className={`auth-tab ${tab==='login'?'active':''}`} onClick={()=>{setTab('login');setErr('')}}>LOGIN</button>
+          <button className={`auth-tab ${tab==='register'?'active':''}`} onClick={()=>{setTab('register');setErr('')}}>SIGN UP</button>
+        </div>
+        {tab==='login' ? (
+          <>
+            <div className="field"><label>USERNAME</label><input value={form.username} onChange={set('username')} placeholder="agent_username" onKeyDown={onKey(doLogin)}/></div>
+            <div className="field"><label>PASSWORD</label><input type="password" value={form.password} onChange={set('password')} placeholder="••••••••" onKeyDown={onKey(doLogin)}/></div>
+          </>
+        ) : (
+          <>
+            <div className="form-row">
+              <div className="field"><label>FIRST NAME</label><input value={form.first_name} onChange={set('first_name')} placeholder="Jane"/></div>
+              <div className="field"><label>LAST NAME</label><input value={form.last_name} onChange={set('last_name')} placeholder="Doe"/></div>
+            </div>
+            <div className="field"><label>USERNAME</label><input value={form.username} onChange={set('username')} placeholder="agent_username"/></div>
+            <div className="field"><label>EMAIL</label><input type="email" value={form.email} onChange={set('email')} placeholder="jane@example.com"/></div>
+            <div className="field"><label>PASSWORD</label><input type="password" value={form.password} onChange={set('password')} placeholder="min 6 chars" onKeyDown={onKey(doRegister)}/></div>
+          </>
+        )}
+        <button className="btn-neon" onClick={tab==='login'?doLogin:doRegister} disabled={loading}>
+          {loading ? <span><span className="loader"></span> PROCESSING...</span> : tab==='login'?'[ AUTHENTICATE ]':'[ CREATE AGENT ]'}
+        </button>
+        {err && <div className="err">⚠ {err}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Sidebar ───────────────────────────────────────────────
+function Sidebar({user, projects, activePage, activeProject, onNav, onProject, onLogout}) {
+  const greet = () => {
+    const h = new Date().getHours();
+    return h<12?'GOOD MORNING':h<17?'GOOD AFTERNOON':'GOOD EVENING';
+  };
+  return (
+    <div className="sidebar">
+      <div className="sidebar-logo">TASK<span style={{color:'var(--pink)'}}>FLOW</span></div>
+      <div className="sidebar-section">
+        <div className="sidebar-label">// NAVIGATION</div>
+        {[['dashboard','⊞','DASHBOARD'],['projects','◈','PROJECTS'],['tasks','✓','MY TASKS']].map(([id,icon,label])=>
+          <div key={id} className={`nav-item ${activePage===id?'active':''}`} onClick={()=>onNav(id)}>
+            <span className="nav-icon">{icon}</span>{label}
+          </div>
+        )}
+      </div>
+      <div className="sidebar-section" style={{flex:1}}>
+        <div className="sidebar-label">// PROJECTS</div>
+        <div className="proj-list">
+          {projects.map(p=>
+            <div key={p.id} className={`proj-nav ${activeProject===p.id?'active':''}`} onClick={()=>onProject(p.id)}>
+              <div className="proj-dot"></div>
+              <span style={{flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="sidebar-user">
+        <div className="user-avatar">{initials(user)}</div>
+        <div className="user-info">
+          <div className="user-name">{user.first_name||user.username}</div>
+          <div className="user-role-tag">{greet()}, AGENT</div>
+        </div>
+        <button className="logout-btn" onClick={onLogout} title="Logout">⇥</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard ─────────────────────────────────────────────
+function Dashboard({user, onOpenTask}) {
+  const [data, setData] = useState(null);
+  useEffect(()=>{ api('GET','/dashboard/').then(setData).catch(()=>{}); },[]);
+
+  if (!data) return <div className="content"><div className="empty"><div className="loader"></div></div></div>;
+
+  return (
+    <>
+      <div className="topbar">
+        <div>
+          <div className="page-title">DASHBOARD</div>
+          <div className="page-sub">// MISSION STATUS OVERVIEW</div>
+        </div>
+      </div>
+      <div className="content">
+        <div className="stats-grid">
+          <div className="stat c" style={{animationDelay:'0s'}}><div className="stat-lbl">PROJECTS</div><div className="stat-val">{data.total_projects}</div><div className="stat-corner">◈</div></div>
+          <div className="stat" style={{borderTopColor:'var(--muted)'}}><div className="stat-lbl">TOTAL TASKS</div><div className="stat-val" style={{color:'var(--text)'}}>{data.total_tasks}</div><div className="stat-corner">✓</div></div>
+          <div className="stat g"><div className="stat-lbl">COMPLETED</div><div className="stat-val">{data.completed_tasks}</div><div className="stat-corner">★</div></div>
+          <div className="stat p"><div className="stat-lbl">OVERDUE</div><div className="stat-val">{data.overdue_tasks}</div><div className="stat-corner">⚠</div></div>
+        </div>
+        <div className="section-hdr"><div className="section-title">// RECENT ACTIVITY</div></div>
+        {data.recent_tasks.length===0
+          ? <div className="empty"><div className="empty-icon">✦</div><div className="empty-title">NO ACTIVITY</div><div className="empty-sub">Create a project and add tasks</div></div>
+          : <div className="tasks-list">{data.recent_tasks.map(t=><TaskRow key={t.id} task={t} onClick={()=>onOpenTask(t.id)}/>)}</div>}
+      </div>
+    </>
+  );
+}
+
+// ── Projects List ─────────────────────────────────────────
+function ProjectsList({onOpenProject, onRefresh}) {
+  const [projects, setProjects] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({name:'',description:''});
+  const load = () => api('GET','/projects/').then(setProjects);
+  useEffect(()=>{load();},[]);
+
+  async function create() {
+    if (!form.name.trim()) return _showToast('Project name required','error');
+    try {
+      await api('POST','/projects/',form);
+      setShowModal(false); setForm({name:'',description:''});
+      load(); onRefresh();
+      _showToast('PROJECT CREATED');
+    } catch(e) { _showToast('Failed to create','error'); }
+  }
+
+  return (
+    <>
+      <div className="topbar">
+        <div><div className="page-title">PROJECTS</div><div className="page-sub">// ACTIVE MISSIONS</div></div>
+        <div className="top-actions">
+          <button className="btn btn-c" onClick={()=>setShowModal(true)}>+ NEW PROJECT</button>
+        </div>
+      </div>
+      <div className="content">
+        {projects.length===0
+          ? <div className="empty"><div className="empty-icon">◈</div><div className="empty-title">NO PROJECTS</div><div className="empty-sub">Deploy your first mission</div></div>
+          : <div className="projects-grid">{projects.map(p=><ProjectCard key={p.id} project={p} onClick={()=>onOpenProject(p.id)}/>)}</div>}
+      </div>
+      {showModal && (
+        <div className="modal-overlay open" onClick={e=>e.target.className.includes('modal-overlay')&&setShowModal(false)}>
+          <div className="modal">
+            <div className="modal-title">// DEPLOY NEW PROJECT</div>
+            <div className="field"><label>PROJECT NAME</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Operation Codebreaker"/></div>
+            <div className="field"><label>DESCRIPTION</label><textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Mission briefing..."/></div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={()=>setShowModal(false)}>CANCEL</button>
+              <button className="btn btn-c" onClick={create}>DEPLOY</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ProjectCard({project:p, onClick}) {
+  const pct = p.task_count ? Math.round(p.completed_count/p.task_count*100) : 0;
+  const members = p.members||[];
+  return (
+    <div className="proj-card" onClick={onClick}>
+      <div className="proj-card-name">{p.name}</div>
+      <div className="proj-card-desc">{p.description||'// No description'}</div>
+      <div className="prog-bar"><div className="prog-fill" style={{width:`${pct}%`}}></div></div>
+      <div className="proj-meta">
+        <span className="proj-counts mono">{p.completed_count}/{p.task_count} tasks</span>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span className="proj-pct">{pct}%</span>
+          <div className="avatar-row">
+            {members.slice(0,3).map((m,i)=>(
+              <div key={m.user.id} className="m-avatar" style={{background:avatarColor(m.user.id),zIndex:3-i}}>{initials(m.user)}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Project Detail ────────────────────────────────────────
+function ProjectDetail({projectId, currentUser, allUsers, onBack, onRefresh}) {
+  const [project, setProject] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [tab, setTab] = useState('board');
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskForm, setTaskForm] = useState({title:'',description:'',priority:'medium',status:'todo',assigned_to_id:null,due_date:''});
+  const [openedTask, setOpenedTask] = useState(null);
+
+  const load = async () => {
+    const [proj, taskList] = await Promise.all([
+      api('GET',`/projects/${projectId}/`),
+      api('GET',`/tasks/?project=${projectId}`)
+    ]);
+    setProject(proj); setTasks(taskList);
+  };
+  useEffect(()=>{load();},[projectId]);
+
+  const isAdmin = project && (project.owner.id===currentUser.id || project.members.some(m=>m.user.id===currentUser.id&&m.role==='admin'));
+
+  async function createTask() {
+    if (!taskForm.title.trim()) return _showToast('Task title required','error');
+    try {
+      await api('POST','/tasks/',{...taskForm, project:projectId, assigned_to_id:taskForm.assigned_to_id||null, due_date:taskForm.due_date||null});
+      setShowTaskModal(false);
+      setTaskForm({title:'',description:'',priority:'medium',status:'todo',assigned_to_id:null,due_date:''});
+      load();
+      _showToast('TASK CREATED');
+    } catch(e) { _showToast('Failed','error'); }
+  }
+
+  async function deleteProject() {
+    if (!confirm('Terminate this project and all tasks?')) return;
+    try { await api('DELETE',`/projects/${projectId}/`); onBack(); onRefresh(); _showToast('PROJECT TERMINATED'); }
+    catch(e) { _showToast('Failed','error'); }
+  }
+
+  if (!project) return <div className="content"><div className="empty"><div className="loader"></div></div></div>;
+
+  const nonOwnerMembers = project.members.filter(m=>m.user.id!==project.owner.id);
+
+  return (
+    <>
+      <div className="topbar">
+        <div>
+          <div className="page-title">{project.name.toUpperCase()}</div>
+          <div className="page-sub">// {project.description||'NO DESCRIPTION'}</div>
+        </div>
+        <div className="top-actions">
+          {isAdmin && <button className="btn btn-c btn-sm" onClick={()=>setShowTaskModal(true)}>+ ADD TASK</button>}
+          {project.owner.id===currentUser.id && <button className="btn btn-p btn-sm" onClick={deleteProject}>TERMINATE</button>}
+        </div>
+      </div>
+      <div className="content">
+        <button className="back-btn" onClick={onBack}>← BACK TO PROJECTS</button>
+        <div className="tabs">
+          {['board','list','members'].map(t=>
+            <div key={t} className={`tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>{t.toUpperCase()}</div>
+          )}
+        </div>
+
+        {tab==='board' && <KanbanBoard tasks={tasks} onClickTask={t=>setOpenedTask(t)}/>}
+        {tab==='list' && (
+          tasks.length===0
+            ? <div className="empty"><div className="empty-icon">✓</div><div className="empty-title">NO TASKS</div></div>
+            : <div className="tasks-list">{tasks.map(t=><TaskRow key={t.id} task={t} onClick={()=>setOpenedTask(t)}/>)}</div>
+        )}
+        {tab==='members' && (
+          <MembersTab project={project} currentUser={currentUser} allUsers={allUsers} onRefresh={load} isAdmin={isAdmin}/>
+        )}
+      </div>
+
+      {showTaskModal && (
+        <div className="modal-overlay open" onClick={e=>e.target.className.includes('modal-overlay')&&setShowTaskModal(false)}>
+          <div className="modal">
+            <div className="modal-title">// NEW TASK</div>
+            <div className="field"><label>TITLE</label><input value={taskForm.title} onChange={e=>setTaskForm(f=>({...f,title:e.target.value}))} placeholder="What must be done?"/></div>
+            <div className="field"><label>DESCRIPTION</label><textarea value={taskForm.description} onChange={e=>setTaskForm(f=>({...f,description:e.target.value}))} placeholder="Task details..."/></div>
+            <div className="form-row">
+              <div className="field"><label>PRIORITY</label>
+                <select value={taskForm.priority} onChange={e=>setTaskForm(f=>({...f,priority:e.target.value}))}>
+                  <option value="low">LOW</option><option value="medium">MEDIUM</option><option value="high">HIGH</option><option value="urgent">URGENT</option>
+                </select>
+              </div>
+              <div className="field"><label>STATUS</label>
+                <select value={taskForm.status} onChange={e=>setTaskForm(f=>({...f,status:e.target.value}))}>
+                  <option value="todo">TODO</option><option value="in_progress">IN PROGRESS</option><option value="review">REVIEW</option><option value="done">DONE</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="field"><label>ASSIGN TO</label>
+                <select value={taskForm.assigned_to_id||''} onChange={e=>setTaskForm(f=>({...f,assigned_to_id:e.target.value||null}))}>
+                  <option value="">UNASSIGNED</option>
+                  {project.members.map(m=><option key={m.user.id} value={m.user.id}>{m.user.username}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>DUE DATE</label><input type="date" value={taskForm.due_date} onChange={e=>setTaskForm(f=>({...f,due_date:e.target.value}))}/></div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={()=>setShowTaskModal(false)}>CANCEL</button>
+              <button className="btn btn-c" onClick={createTask}>CREATE</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openedTask && (
+        <TaskDetailModal task={openedTask} currentUser={currentUser} project={project} isAdmin={isAdmin}
+          onClose={()=>{setOpenedTask(null);load();}} onRefresh={load}/>
+      )}
+    </>
+  );
+}
+
+// ── Kanban ─────────────────────────────────────────────────
+function KanbanBoard({tasks, onClickTask}) {
+  const cols = [
+    {key:'todo',label:'TO DO',color:'var(--muted)'},
+    {key:'in_progress',label:'IN PROGRESS',color:'var(--cyan)'},
+    {key:'review',label:'REVIEW',color:'var(--yellow)'},
+    {key:'done',label:'DONE',color:'var(--green)'}
+  ];
+  return (
+    <div className="kanban">
+      {cols.map(col=>{
+        const colTasks = tasks.filter(t=>t.status===col.key);
+        return (
+          <div key={col.key} className="kan-col">
+            <div className="kan-col-hdr">
+              <span className="kan-col-title" style={{color:col.color,textShadow:`0 0 8px ${col.color}60`}}>{col.label}</span>
+              <span className="kan-count" style={{color:col.color}}>{colTasks.length}</span>
+            </div>
+            {colTasks.map(t=>(
+              <div key={t.id} className="kan-task" onClick={()=>onClickTask(t)} style={{'--task-color':statusColors[t.status]}}>
+                <div style={{position:'absolute',left:0,top:0,bottom:0,width:2,background:statusColors[t.status],boxShadow:`0 0 6px ${statusColors[t.status]}`}}></div>
+                <div className="kan-task-title">{t.title}</div>
+                <div className="kan-task-footer">
+                  <span className={`badge b-${t.priority}`}>{t.priority.toUpperCase()}</span>
+                  {t.due_date&&<span className="mono" style={{fontSize:10,color:isOverdue(t.due_date,t.status)?'var(--pink)':'var(--muted)'}}>{fmtDate(t.due_date)}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Task Row ─────────────────────────────────────────────
+function TaskRow({task:t, onClick}) {
+  const over = isOverdue(t.due_date, t.status);
+  const sc = statusColors[t.status];
+  return (
+    <div className="task-row" onClick={onClick} style={{'--sc':sc}}>
+      <div style={{position:'absolute',left:0,top:0,bottom:0,width:2,background:sc,boxShadow:`0 0 6px ${sc}`}}></div>
+      <div className="task-status-dot" style={{background:sc,boxShadow:statusGlows[t.status]}}></div>
+      <div className={`task-title ${t.status==='done'?'done':''}`}>{t.title}</div>
+      <div className="task-row-meta">
+        <span className={`badge b-${t.priority}`}>{t.priority.toUpperCase()}</span>
+        <span className={`badge b-${t.status}`}>{t.status.replace('_',' ').toUpperCase()}</span>
+        {over&&<span className="badge b-overdue">OVERDUE</span>}
+        {t.due_date&&<span className="mono" style={{fontSize:11,color:over?'var(--pink)':'var(--muted)'}}>{fmtDate(t.due_date)}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Task Detail Modal ─────────────────────────────────────
+function TaskDetailModal({task:initial, project, currentUser, isAdmin, onClose, onRefresh}) {
+  const [task, setTask] = useState(initial);
+
+  async function updateField(field, value) {
+    try {
+      const updated = await api('PATCH',`/tasks/${task.id}/`,{[field]:value});
+      setTask(updated); _showToast('UPDATED');
+    } catch(e) { _showToast('Update failed','error'); }
+  }
+
+  async function deleteTask() {
+    if (!confirm('Terminate task?')) return;
+    try { await api('DELETE',`/tasks/${task.id}/`); onClose(); _showToast('TASK TERMINATED'); }
+    catch(e) { _showToast('Failed','error'); }
+  }
+
+  return (
+    <div className="modal-overlay open" onClick={e=>e.target.className.includes('modal-overlay')&&onClose()}>
+      <div className="modal">
+        <div className="modal-title">{task.title.toUpperCase()}</div>
+        {task.description&&<div style={{color:'var(--muted2)',fontFamily:'var(--font-mono)',fontSize:12,marginBottom:20,lineHeight:1.6}}>{task.description}</div>}
+        <div className="form-row" style={{marginBottom:16}}>
+          <div className="field"><label>STATUS</label>
+            <select value={task.status} onChange={e=>updateField('status',e.target.value)}>
+              <option value="todo">TODO</option><option value="in_progress">IN PROGRESS</option><option value="review">REVIEW</option><option value="done">DONE</option>
+            </select>
+          </div>
+          <div className="field"><label>PRIORITY</label>
+            <select value={task.priority} onChange={e=>updateField('priority',e.target.value)} disabled={!isAdmin}>
+              <option value="low">LOW</option><option value="medium">MEDIUM</option><option value="high">HIGH</option><option value="urgent">URGENT</option>
+            </select>
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,padding:'16px 0',borderTop:'1px solid var(--border)',borderBottom:'1px solid var(--border)',marginBottom:4}}>
+          <div><div style={{fontFamily:'var(--font-mono)',fontSize:10,color:'var(--muted)',letterSpacing:2,marginBottom:6}}>ASSIGNED TO</div>
+            <div style={{fontFamily:'var(--font-mono)',fontSize:13,color:task.assigned_to?'var(--cyan)':'var(--muted)'}}>{task.assigned_to?task.assigned_to.username:'UNASSIGNED'}</div>
+          </div>
+          <div><div style={{fontFamily:'var(--font-mono)',fontSize:10,color:'var(--muted)',letterSpacing:2,marginBottom:6}}>DUE DATE</div>
+            <div style={{fontFamily:'var(--font-mono)',fontSize:13,color:isOverdue(task.due_date,task.status)?'var(--pink)':'var(--text)'}}>{fmtDate(task.due_date)}</div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          {isAdmin&&<button className="btn btn-p btn-sm" onClick={deleteTask}>TERMINATE</button>}
+          <button className="btn btn-ghost" onClick={onClose}>CLOSE</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Members Tab ───────────────────────────────────────────
+function MembersTab({project, currentUser, allUsers, onRefresh, isAdmin}) {
+  const [addUserId, setAddUserId] = useState('');
+  const [addRole, setAddRole] = useState('member');
+  const nonOwnerMembers = project.members.filter(m=>m.user.id!==project.owner.id);
+  const otherUsers = allUsers.filter(u=>!project.members.some(m=>m.user.id===u.id)&&u.id!==project.owner.id);
+  const isOwner = project.owner.id===currentUser.id;
+
+  async function addMember() {
+    if (!addUserId) return _showToast('Select agent','error');
+    try {
+      await api('POST',`/projects/${project.id}/add_member/`,{user_id:parseInt(addUserId),role:addRole});
+      _showToast('AGENT ADDED'); onRefresh();
+    } catch(e) { _showToast('Failed','error'); }
+  }
+  async function removeMember(uid) {
+    try { await api('DELETE',`/projects/${project.id}/remove_member/${uid}/`); _showToast('AGENT REMOVED'); onRefresh(); }
+    catch(e) { _showToast('Failed','error'); }
+  }
+
+  return (
+    <div>
+      {isAdmin && otherUsers.length>0 && (
+        <div className="add-member-row" style={{marginBottom:20}}>
+          <div className="field" style={{flex:2}}>
+            <label>ADD AGENT</label>
+            <select value={addUserId} onChange={e=>setAddUserId(e.target.value)}>
+              <option value="">Select agent...</option>
+              {otherUsers.map(u=><option key={u.id} value={u.id}>{u.username} {u.first_name?`(${u.first_name})`:''}</option>)}
+            </select>
+          </div>
+          <div className="field" style={{flex:1}}>
+            <label>ROLE</label>
+            <select value={addRole} onChange={e=>setAddRole(e.target.value)}>
+              <option value="member">MEMBER</option><option value="admin">ADMIN</option>
+            </select>
+          </div>
+          <div style={{paddingTop:22}}><button className="btn btn-c btn-sm" onClick={addMember}>ADD</button></div>
+        </div>
+      )}
+      <table className="mtable">
+        <thead><tr><th>AGENT</th><th>CLEARANCE</th><th>JOINED</th>{isOwner&&<th>ACTION</th>}</tr></thead>
+        <tbody>
+          <tr>
+            <td><span style={{color:'var(--cyan)'}}>{project.owner.username}</span></td>
+            <td><span className="badge b-owner">OWNER</span></td>
+            <td className="clr-muted">—</td>
+            {isOwner&&<td>—</td>}
+          </tr>
+          {nonOwnerMembers.map(m=>(
+            <tr key={m.user.id}>
+              <td>{m.user.username}{m.user.first_name&&<span className="clr-muted" style={{fontSize:11,marginLeft:6}}>({m.user.first_name})</span>}</td>
+              <td><span className={`badge b-${m.role}`}>{m.role.toUpperCase()}</span></td>
+              <td className="clr-muted mono" style={{fontSize:11}}>{new Date(m.joined_at).toLocaleDateString()}</td>
+              {isOwner&&<td><button className="btn btn-p btn-xs" onClick={()=>removeMember(m.user.id)}>REMOVE</button></td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── My Tasks ─────────────────────────────────────────────
+function MyTasks({onOpenTask}) {
+  const [tasks, setTasks] = useState([]);
+  const [filter, setFilter] = useState('all');
+  useEffect(()=>{ api('GET','/tasks/?mine=1').then(setTasks).catch(()=>{}); },[]);
+  const filtered = filter==='all' ? tasks : tasks.filter(t=>t.status===filter);
+
+  return (
+    <>
+      <div className="topbar">
+        <div><div className="page-title">MY TASKS</div><div className="page-sub">// PERSONAL MISSION QUEUE</div></div>
+      </div>
+      <div className="content">
+        <div className="filters">
+          {['all','todo','in_progress','review','done'].map(f=>(
+            <button key={f} className={`filter-chip ${filter===f?'active':''}`} onClick={()=>setFilter(f)}>{f.replace('_',' ').toUpperCase()}</button>
+          ))}
+        </div>
+        {filtered.length===0
+          ? <div className="empty"><div className="empty-icon">✓</div><div className="empty-title">NO TASKS</div><div className="empty-sub">Nothing here, agent</div></div>
+          : <div className="tasks-list">{filtered.map(t=><TaskRow key={t.id} task={t} onClick={()=>onOpenTask(t.id)}/>)}</div>}
+      </div>
+    </>
+  );
+}
+
+// ── Root App ──────────────────────────────────────────────
+function App() {
+  const [user, setUser] = useState(null);
+  const [page, setPage] = useState('dashboard');
+  const [projects, setProjects] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState(null);
+  const [taskModal, setTaskModal] = useState(null);
+  const [booting, setBooting] = useState(true);
+  const toast = useToast();
+
+  useEffect(()=>{
+    if (_token) {
+      api('GET','/auth/me/').then(u=>{ setUser(u); loadProjects(); setBooting(false); })
+        .catch(()=>{ setBooting(false); });
+    } else { setBooting(false); }
+  },[]);
+
+  const loadProjects = () => api('GET','/projects/').then(setProjects).catch(()=>{});
+
+  function handleAuth(u) { setUser(u); loadProjects(); setPage('dashboard'); }
+  function handleLogout() { _token=''; localStorage.removeItem('tf_token'); setUser(null); setPage('dashboard'); }
+  function openProject(id) { setActiveProjectId(id); setPage('project-detail'); }
+  function openTask(id) { api('GET',`/tasks/${id}/`).then(setTaskModal); }
+
+  if (booting) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh'}}><span className="loader"></span></div>;
+  if (!user) return (<><AuthScreen onAuth={handleAuth}/><Toast {...toast}/></>);
+
+  return (
+    <div className="app">
+      <Sidebar user={user} projects={projects} activePage={page} activeProject={activeProjectId}
+        onNav={p=>setPage(p)} onProject={openProject} onLogout={handleLogout}/>
+      <div className="main">
+        {page==='dashboard'&&<Dashboard user={user} onOpenTask={id=>api('GET',`/tasks/${id}/`).then(setTaskModal)}/>}
+        {page==='projects'&&<ProjectsList onOpenProject={openProject} onRefresh={loadProjects}/>}
+        {page==='tasks'&&<MyTasks onOpenTask={id=>api('GET',`/tasks/${id}/`).then(setTaskModal)}/>}
+        {page==='project-detail'&&activeProjectId&&(
+          <ProjectDetail projectId={activeProjectId} currentUser={user} allUsers={[]} onBack={()=>setPage('projects')} onRefresh={loadProjects}/>
+        )}
+      </div>
+      {taskModal&&(
+        <TaskDetailModal task={taskModal} project={{owner:taskModal.created_by,members:[]}} currentUser={user}
+          isAdmin={taskModal.created_by?.id===user.id}
+          onClose={()=>setTaskModal(null)} onRefresh={()=>{}}/>
+      )}
+      <Toast {...toast}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
